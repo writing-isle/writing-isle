@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>写作之岛 · 三叠纸</title>
+  <style>
+    /* ========== 全局重置 ========== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 30%, #2A4A3A 0%, #1A3324 100%);
+      background-attachment: fixed;
+      font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 8rem 2rem 3rem 2rem;
+      transition: background 0.4s ease;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      font-weight: 350;
+    }
+
+    body.night-mode {
+      background: radial-gradient(circle at 50% 30%, #1A2A1E 0%, #0F231A 100%);
+      background-attachment: fixed;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ========== 标题与署名 ========== */
+    .isle-title {
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      font-weight: 500;
+      font-size: 2.6rem;
+      font-style: italic;
+      letter-spacing: 5px;
+      color: #D4CFB8;
+      margin-bottom: 5rem;
+      padding-left: 0.8rem;
+      text-transform: uppercase;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 40px rgba(184, 174, 124, 0.15);
+      opacity: 0.95;
+    }
+
+    /* 署名 —— 可点击 */
+    .signature {
+      position: fixed;
+      bottom: 18px;
+      left: 22px;
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      font-size: 0.8rem;
+      font-style: italic;
+      color: #A4B8A0;
+      opacity: 0.35;
+      letter-spacing: 1.5px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+      z-index: 100;
+      cursor: pointer;
+      backdrop-filter: blur(1px);
+      transition: opacity 0.2s;
+      pointer-events: auto;
+    }
+
+    .signature:hover {
+      opacity: 0.7;
+    }
+
+    /* 导入导出菜单 */
+    .backup-menu {
+      position: fixed;
+      bottom: 50px;
+      left: 22px;
+      background: rgba(26, 51, 36, 0.75);
+      backdrop-filter: blur(12px);
+      border-radius: 24px;
+      border: 0.5px solid rgba(184, 174, 124, 0.2);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      padding: 8px 6px;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 101;
+      min-width: 120px;
+    }
+
+    .backup-menu.show {
+      display: flex;
+    }
+
+    .backup-btn {
+      background: transparent;
+      border: none;
+      padding: 8px 16px;
+      color: #D4CFB8;
+      font-size: 0.75rem;
+      font-weight: 300;
+      letter-spacing: 1px;
+      cursor: pointer;
+      text-align: left;
+      border-radius: 20px;
+      transition: background 0.15s;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .backup-btn:hover {
+      background: rgba(110, 127, 78, 0.3);
+    }
+
+    #importBackupInput {
+      display: none;
+    }
+
+    /* ========== 三叠纸容器 ========== */
+    .paper-stack {
+      position: relative;
+      margin: 0 auto;
+      width: 100%;
+      min-height: 720px;
+    }
+
+    .paper-sheet {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      min-height: 720px;
+      border-radius: 4px 20px 20px 4px;
+      padding: 3.5rem 6rem 2rem 6rem;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        box-shadow 0.4s ease,
+        opacity 0.35s ease,
+        filter 0.3s ease;
+      background: #FCFAF4;
+      background-image:
+        linear-gradient(rgba(180, 170, 140, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(180, 170, 140, 0.03) 1px, transparent 1px);
+      background-size: 28px 28px;
+      box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.15),
+        inset 0 0 0 1px rgba(210, 190, 160, 0.35);
+      border: 1px solid rgba(140, 120, 90, 0.12);
+    }
+
+    .paper-sheet:not(.active) {
+      opacity: 0.65;
+      filter: brightness(0.92);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .paper-sheet.active {
+      opacity: 1;
+      filter: brightness(1);
+      pointer-events: all;
+      z-index: 30;
+      transform: translateY(-6px) translateX(0);
+      box-shadow: 0 28px 42px -12px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(210, 190, 160, 0.2),
+        inset 0 0 0 1px rgba(255, 250, 240, 0.6);
+    }
+
+    #writePaper:not(.active) {
+      transform: translateY(18px) translateX(-8px);
+    }
+
+    #draftPaper:not(.active) {
+      transform: translateY(12px) translateX(-10px);
+    }
+
+    #collectionPaper:not(.active) {
+      transform: translateY(24px) translateX(-6px);
+    }
+
+    body.night-mode .paper-sheet {
+      background: #E8E2D4;
+      background-image:
+        linear-gradient(rgba(140, 130, 100, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(140, 130, 100, 0.04) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    /* ========== 右侧标签 ========== */
+    .paper-tabs {
+      position: absolute;
+      right: -2px;
+      top: 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 12px;
+      z-index: 50;
+    }
+
+    .tab-btn {
+      background: #A3A87A;
+      border: none;
+      padding: 8px 22px 8px 26px;
+      border-radius: 40px 0 0 40px;
+      font-size: 0.95rem;
+      font-weight: 300;
+      font-style: italic;
+      letter-spacing: 2px;
+      box-shadow: -6px 8px 14px rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1);
+      backdrop-filter: blur(6px);
+      border: 0.5px solid rgba(255, 250, 230, 0.3);
+      font-family: 'Inter', sans-serif;
+      text-transform: uppercase;
+      min-width: 90px;
+      text-align: right;
+    }
+
+    .tab-btn[data-tab="write"] {
+      background-color: rgba(200, 195, 130, 0.85);
+      color: #3A4A3A;
+    }
+
+    .tab-btn[data-tab="draft"] {
+      background-color: rgba(110, 127, 78, 0.8);
+      color: #F0F3E3;
+    }
+
+    .tab-btn[data-tab="collection"] {
+      background-color: rgba(62, 94, 68, 0.82);
+      color: #EFF2E8;
+    }
+
+    .tab-btn:hover {
+      transform: translateX(-8px) translateY(-2px);
+    }
+
+    .tab-btn.active {
+      transform: translateX(-14px) translateY(-3px);
+      font-weight: 350;
+      border-right: 2px solid rgba(255, 250, 220, 0.6);
+      box-shadow: -10px 12px 18px rgba(0, 0, 0, 0.1);
+    }
+
+    /* ========== 写作区 ========== */
+    .writing-area,
+    .draft-view,
+    .collection-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 悬挂文集名 */
+    .collection-badge {
+      position: absolute;
+      left: -16px;
+      top: 68px;
+      transform: translateX(-100%);
+      background: rgba(62, 94, 68, 0.8);
+      backdrop-filter: blur(8px);
+      padding: 8px 20px 8px 16px;
+      border-radius: 30px 0 0 30px;
+      border: 0.5px solid rgba(210, 190, 160, 0.3);
+      box-shadow: -6px 8px 14px rgba(0, 0, 0, 0.08);
+      font-family: 'Times New Roman', serif;
+      font-size: 0.95rem;
+      font-style: italic;
+      color: #E0E6D2;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      z-index: 55;
+      display: none;
+    }
+
+    .collection-badge.show {
+      display: block;
+    }
+
+    .collection-badge:hover {
+      background: rgba(80, 110, 80, 0.9);
+      transform: translateX(calc(-100% - 4px));
+    }
+
+    .title-wrap {
+      margin-top: 1.2rem;
+      margin-bottom: 2.8rem;
+      border-bottom: 1px dashed rgba(100, 90, 60, 0.18);
+      padding-bottom: 1rem;
+    }
+
+    .title-input {
+      background: transparent;
+      border: none;
+      font-size: 2.2rem;
+      font-weight: 340;
+      color: #1F2E1F;
+      width: 100%;
+      outline: none;
+      font-family: 'Inter', 'Times New Roman', serif;
+      letter-spacing: 0.5px;
+      padding: 0.3rem 0;
+    }
+
+    .title-input::placeholder {
+      color: #8A927A;
+      opacity: 0.35;
+      font-weight: 280;
+    }
+
+    .editor {
+      font-family: 'Inter', 'Georgia', 'Times New Roman', serif;
+      font-size: 16px;
+      line-height: 2.0;
+      color: #1F2E1F;
+      min-height: 380px;
+      outline: none;
+      padding: 0.3rem 0 2rem 0;
+      word-break: break-word;
+      white-space: pre-wrap;
+      flex: 1;
+      font-weight: 340;
+      letter-spacing: 0.8px;
+    }
+
+    .editor:empty:before {
+      content: "写下第一个字⋯⋯";
+      color: #8A927A;
+      opacity: 0.4;
+      font-style: italic;
+    }
+
+    /* ========== 底栏 ========== */
+    .writing-footer {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 2.5rem;
+      padding-top: 1.2rem;
+      border-top: 1px solid rgba(100, 90, 60, 0.1);
+      gap: 20px;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .btn {
+      background: transparent;
+      border: 0.5px solid #9A9F82;
+      padding: 5px 16px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      color: #4A5E4A;
+      cursor: pointer;
+      backdrop-filter: blur(3px);
+      transition: all 0.2s;
+      font-weight: 300;
+      font-style: normal;
+      background-color: rgba(220, 210, 185, 0.2);
+      letter-spacing: 0.5px;
+      font-family: 'Inter', sans-serif;
+      line-height: 1.5;
+    }
+
+    .btn:hover {
+      background-color: rgba(163, 168, 122, 0.15);
+      border-color: #6E7F4E;
+    }
+
+    .btn-danger {
+      border-color: #C08070;
+      color: #8B4E4E;
+      background-color: rgba(200, 140, 120, 0.06);
+    }
+
+    .btn-danger:hover {
+      background-color: rgba(200, 120, 100, 0.15);
+      border-color: #A06060;
+    }
+
+    /* 翻页按钮 */
+    .page-nav {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      margin-left: 8px;
+    }
+
+    .page-nav.show {
+      display: flex;
+    }
+
+    .page-nav-btn {
+      background: transparent;
+      border: none;
+      padding: 0 6px;
+      font-size: 1.2rem;
+      font-weight: 200;
+      color: #6A7A5A;
+      opacity: 0.5;
+      cursor: pointer;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+
+    .page-nav-btn:hover {
+      opacity: 0.9;
+      color: #4A5E4A;
+    }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+    }
+
+    .font-controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 0.75rem;
+      color: #4A5E4A;
+      font-weight: 300;
+    }
+
+    .font-controls label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-style: normal;
+      font-weight: 300;
+    }
+
+    input[type="range"] {
+      width: 60px;
+      height: 3px;
+      background: rgba(110, 127, 78, 0.18);
+      border-radius: 10px;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      background: #6E7F4E;
+      border-radius: 12px;
+      border: 1px solid #D0D8B8;
+      cursor: pointer;
+    }
+
+    .word-count {
+      font-size: 0.7rem;
+      color: #6A7A5A;
+      opacity: 0.7;
+      margin-left: 14px;
+      font-style: normal;
+      font-weight: 300;
+      display: inline-block;
+      min-width: 55px;
+      text-align: right;
+    }
+
+    .new-page-btn {
+      background: transparent;
+      border: none;
+      padding: 0 8px;
+      margin-left: 8px;
+      font-size: 1.4rem;
+      font-weight: 200;
+      color: #6A7A5A;
+      opacity: 0.5;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+      line-height: 1;
+      transform: translateY(-1px);
+    }
+
+    .new-page-btn:hover {
+      opacity: 0.9;
+      color: #4A5E4A;
+    }
+
+    /* ========== 草稿与文集视图 ========== */
+    .view-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.2rem;
+      margin-top: 1rem;
+    }
+
+    .view-header span {
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      font-size: 1.8rem;
+      font-weight: 400;
+      font-style: italic;
+      color: #8A7A5A;
+      letter-spacing: 2px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .entry-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      max-height: 500px;
+      padding-right: 20px;
+    }
+
+    .entry-item {
+      background: rgba(235, 228, 215, 0.5);
+      backdrop-filter: blur(4px);
+      padding: 14px 18px;
+      border-radius: 16px;
+      border-left: 10px solid #6E7F4E;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-right: 8px;
+    }
+
+    .entry-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .entry-title {
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-size: 1.05rem;
+      color: #4A5E4A;
+      letter-spacing: 0.3px;
+    }
+
+    .entry-preview {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 300;
+      color: #6A7A5A;
+      opacity: 0.75;
+    }
+
+    .empty-placeholder {
+      padding: 32px !important;
+      text-align: center;
+      color: #8A927A;
+      font-style: italic;
+      font-weight: 280;
+      font-size: 0.85rem;
+      opacity: 0.4;
+      letter-spacing: 0.8px;
+      grid-column: 1 / -1;
+    }
+
+    /* ========== 文集网格 ========== */
+    .collections-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 24px;
+      margin-top: 8px;
+      padding-right: 16px;
+    }
+
+    .folder-card {
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .folder-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .folder-cover {
+      border-radius: 8px 12px 8px 8px;
+      padding: 1.2rem 0.8rem 1rem;
+      box-shadow: 0 10px 16px -6px rgba(0, 0, 0, 0.12), inset 0 -2px 0 rgba(0, 0, 0, 0.06);
+      border-bottom: 3px solid #2A4A2E;
+      position: relative;
+    }
+
+    .folder-tab {
+      position: absolute;
+      top: -8px;
+      left: 12px;
+      width: 40px;
+      height: 14px;
+      background: #4A6E4E;
+      border-radius: 6px 6px 0 0;
+    }
+
+    .folder-name {
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      font-weight: 400;
+      font-size: 1rem;
+      font-style: italic;
+      letter-spacing: 0.8px;
+      color: #E0E6D2;
+      margin-bottom: 6px;
+      display: inline-block;
+    }
+
+    .folder-count {
+      font-family: 'Inter', sans-serif;
+      font-weight: 300;
+      font-size: 0.7rem;
+      color: #BCC7AD;
+      margin-top: 4px;
+      opacity: 0.85;
+    }
+
+    /* ========== 文集内页大外框 —— 恢复左侧色带，提亮 ========== */
+    .collection-detail-panel {
+      margin-top: 16px;
+      padding: 1.5rem 1.8rem 1.5rem 2.2rem;
+      background: #f5f0e5;
+      /* 提亮的暖米色 */
+      border-left: 10px solid #6E7F4E;
+      /* 左侧色带 */
+      border-radius: 8px 16px 16px 8px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(210, 190, 160, 0.2);
+    }
+
+    body.night-mode .collection-detail-panel {
+      background: #D9D2BE;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.8rem;
+    }
+
+    .detail-header span {
+      font-family: 'Times New Roman', serif;
+      font-size: 1.5rem;
+      font-style: italic;
+      color: #5A4A3A;
+    }
+
+    .detail-header-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* 文章卡片 —— 横线信纸，提亮，更方正 */
+    .articles-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .article-card {
+      background: #F7F3EA;
+      background-image: repeating-linear-gradient(to bottom,
+          transparent,
+          transparent 23px,
+          rgba(180, 170, 140, 0.08) 23px,
+          rgba(180, 170, 140, 0.08) 24px);
+      padding: 18px 16px 16px 16px;
+      border-radius: 12px;
+      border: 0.5px solid rgba(140, 120, 90, 0.12);
+      box-shadow: inset 0 0 0 1px rgba(250, 245, 235, 0.8), 0 2px 8px rgba(0, 0, 0, 0.04);
+      cursor: pointer;
+      transition: transform 0.15s, background 0.2s;
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+    }
+
+    .article-card:hover {
+      background: #FCF9F2;
+      transform: translateY(-2px);
+    }
+
+    .article-card-title {
+      font-family: 'Times New Roman', serif;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #4A5E4A;
+      margin-bottom: 10px;
+      letter-spacing: 0.3px;
+    }
+
+    .article-card-preview {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 300;
+      color: #6A7A5A;
+      opacity: 0.85;
+      line-height: 1.8;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      flex: 1;
+      margin-bottom: 16px;
+    }
+
+    /* 按钮组 —— 底部，与文字分开 */
+    .article-card-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 0.5px dashed rgba(140, 120, 90, 0.15);
+    }
+
+    .article-card-actions .btn {
+      padding: 4px 12px;
+      font-size: 0.65rem;
+      background: rgba(220, 210, 185, 0.4);
+      backdrop-filter: blur(2px);
+    }
+
+    /* 朝花夕拾 */
+    .zhaohua-xishi {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 2rem 0;
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      font-size: 1.2rem;
+      font-style: italic;
+      color: #7A6A5A;
+      opacity: 0.2;
+      letter-spacing: 4px;
+    }
+
+    .collection-footer {
+      margin-top: auto;
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 24px;
+      padding-right: 16px;
+    }
+
+    .flex-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ========== 日夜切换 ========== */
+    .theme-toggle {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: rgba(45, 65, 45, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 6px 18px;
+      border-radius: 50px;
+      color: #F1EFDD;
+      font-size: 0.75rem;
+      font-weight: 300;
+      border: 0.5px solid #B8AE7C;
+      cursor: pointer;
+      z-index: 100;
+    }
+
+    /* ========== 音乐播放器 ========== */
+    .music-player {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .music-icon {
+      font-size: 1.8rem;
+      color: #A4B8A0;
+      opacity: 0.35;
+      cursor: pointer;
+      transition: opacity 0.25s;
+      user-select: none;
+      line-height: 1;
+    }
+
+    .music-icon:hover {
+      opacity: 0.7;
+    }
+
+    .player-panel {
+      display: none;
+      margin-top: 8px;
+      padding: 14px 18px;
+      background: rgba(26, 51, 36, 0.75);
+      backdrop-filter: blur(12px);
+      border-radius: 30px;
+      border: 0.5px solid rgba(184, 174, 124, 0.2);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      flex-direction: column;
+      gap: 10px;
+      min-width: 300px;
+    }
+
+    .player-panel.show {
+      display: flex;
+    }
+
+    .player-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ctrl-btn {
+      background: transparent;
+      border: none;
+      color: #D4CFB8;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 4px 6px;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+      line-height: 1;
+    }
+
+    .ctrl-btn:hover {
+      opacity: 1;
+    }
+
+    .mode-btn {
+      font-size: 1.2rem;
+      font-weight: 300;
+      min-width: 28px;
+      text-align: center;
+    }
+
+    /* 进度条 —— 极细线，无滑块 */
+    .progress-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .progress-slider {
+      flex: 1;
+      height: 2px;
+      background: rgba(212, 207, 184, 0.2);
+      border-radius: 0;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    .progress-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 0;
+      height: 0;
+      opacity: 0;
+    }
+
+    .progress-slider::-moz-range-thumb {
+      width: 0;
+      height: 0;
+      opacity: 0;
+    }
+
+    .time-display {
+      color: #D4CFB8;
+      font-size: 0.6rem;
+      font-weight: 300;
+      opacity: 0.6;
+      min-width: 70px;
+      text-align: right;
+    }
+
+    .volume-slider {
+      width: 70px;
+      height: 2px;
+      background: rgba(212, 207, 184, 0.2);
+      border-radius: 2px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px;
+      height: 10px;
+      background: #D4CFB8;
+      border-radius: 10px;
+      cursor: pointer;
+      opacity: 0.8;
+    }
+
+    .track-info {
+      color: #D4CFB8;
+      font-size: 0.7rem;
+      font-weight: 300;
+      opacity: 0.6;
+      max-width: 160px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .file-label {
+      color: #6A7A5A;
+      font-size: 1.2rem;
+      font-weight: 200;
+      cursor: pointer;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+      background: transparent;
+      border: none;
+      line-height: 1;
+      padding: 0 2px;
+    }
+
+    .file-label:hover {
+      opacity: 0.9;
+    }
+
+    #musicFileInput {
+      display: none;
+    }
+
+    .playlist-container {
+      border-top: 0.5px solid rgba(184, 174, 124, 0.15);
+      padding-top: 8px;
+      margin-top: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .playlist-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-radius: 20px;
+      color: #D4CFB8;
+      font-size: 0.7rem;
+      font-weight: 300;
+      opacity: 0.7;
+      cursor: grab;
+      transition: background 0.15s;
+    }
+
+    .playlist-item:hover {
+      background: rgba(212, 207, 184, 0.08);
+      opacity: 1;
+    }
+
+    .playlist-item.active-track {
+      background: rgba(110, 127, 78, 0.3);
+      opacity: 1;
+    }
+
+    .playlist-item-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: 8px;
+    }
+
+    .playlist-item-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .playlist-btn {
+      background: transparent;
+      border: none;
+      color: #D4CFB8;
+      font-size: 0.7rem;
+      cursor: pointer;
+      opacity: 0.5;
+      padding: 2px;
+    }
+
+    .playlist-btn:hover {
+      opacity: 1;
+    }
+
+    .playlist-empty {
+      color: #D4CFB8;
+      font-size: 0.65rem;
+      opacity: 0.35;
+      text-align: center;
+      padding: 12px 0;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ========== 音乐播放器 ========== -->
+  <div class="music-player">
+    <div class="music-icon" id="musicIcon">♪</div>
+    <div class="player-panel" id="playerPanel">
+      <div class="player-controls">
+        <label for="musicFileInput" class="file-label" title="添加音乐">+</label>
+        <input type="file" id="musicFileInput" accept="audio/*" multiple>
+        <button class="ctrl-btn" id="prevBtn" title="上一曲">⏮</button>
+        <button class="ctrl-btn" id="playPauseBtn" title="播放/暂停">⏯</button>
+        <button class="ctrl-btn" id="nextBtn" title="下一曲">⏭</button>
+        <button class="ctrl-btn mode-btn" id="modeBtn" title="顺序循环">⟲</button>
+        <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.01" value="0.5">
+      </div>
+      <div class="progress-container">
+        <input type="range" id="progressSlider" class="progress-slider" min="0" max="100" step="0.1" value="0">
+        <span class="time-display" id="timeDisplay">00:00 / 00:00</span>
+      </div>
+      <span class="track-info" id="trackInfo">未选择音乐</span>
+      <div class="playlist-container" id="playlistContainer">
+        <div class="playlist-empty">点击 + 添加音乐</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 导入导出菜单 ========== -->
+  <div class="backup-menu" id="backupMenu">
+    <button class="backup-btn" id="exportBackupBtn">导出备份</button>
+    <button class="backup-btn" id="importBackupBtn">导入备份</button>
+    <input type="file" id="importBackupInput" accept=".json,application/json">
+  </div>
+
+  <!-- ========== 主应用 ========== -->
+  <div class="app">
+    <div class="isle-title">The Isle of Writing</div>
+    <div class="signature" id="signature">designed by H＆D</div>
+
+    <div class="paper-stack">
+      <div class="paper-tabs">
+        <button class="tab-btn active" data-tab="write">写作</button>
+        <button class="tab-btn" data-tab="draft">草稿</button>
+        <button class="tab-btn" data-tab="collection">文集</button>
+      </div>
+
+      <!-- 写作纸 -->
+      <div class="paper-sheet active" id="writePaper">
+        <div class="collection-badge" id="collectionBadge"></div>
+        <div class="writing-area">
+          <div class="title-wrap">
+            <input type="text" class="title-input" id="docTitle" placeholder="·" autocomplete="off">
+          </div>
+          <div id="editor" class="editor" contenteditable="true"></div>
+          <div class="writing-footer">
+            <div class="action-buttons">
+              <button class="btn" id="saveCurrentBtn">保存此页</button>
+              <button class="btn" id="saveToDraftBtn">存入草稿</button>
+              <button class="btn" id="saveToCollectionBtn">存入文集</button>
+              <div class="page-nav" id="pageNav">
+                <button class="page-nav-btn" id="prevArticleBtn">←</button>
+                <button class="page-nav-btn" id="nextArticleBtn">→</button>
+              </div>
+            </div>
+            <div class="footer-right">
+              <div class="font-controls">
+                <label>字 <input type="range" id="fontSizeSlider" min="12" max="24" value="16" step="1"></label>
+                <label>行距 <input type="range" id="lineHeightSlider" min="1.4" max="2.8" value="2.0" step="0.1"></label>
+              </div>
+              <span class="word-count" id="wordCount">0 字</span>
+              <button class="new-page-btn" id="newPageBtn" title="新建空白页">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 草稿纸 -->
+      <div class="paper-sheet" id="draftPaper">
+        <div class="draft-view">
+          <div class="view-header">
+            <span>Drafts</span>
+          </div>
+          <div id="draftListContainer" class="entry-list"></div>
+        </div>
+      </div>
+
+      <!-- 文集纸 -->
+      <div class="paper-sheet" id="collectionPaper">
+        <div class="collection-view">
+          <div class="view-header">
+            <span>Collections</span>
+          </div>
+          <div id="collectionsContainer" class="collections-grid"></div>
+          <div id="collectionDetailPanel" class="collection-detail-panel" style="display: none;"></div>
+          <div class="collection-footer">
+            <button class="btn" id="newCollectionBtn">＋ 新建文集</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 日夜切换 ========== -->
+  <div class="theme-toggle" id="themeToggle">日 / 夜</div>
+
+  <script>
+    // ========== 写作核心功能（修复草稿幽灵问题） ==========
+    (function () {
+      let currentDoc = { title: '', body: '' };
+      let currentDraftId = null;
+      let currentCollectionSource = null;
+      let drafts = [];
+      let collections = [];
+      let activeCollectionId = null;
+      let currentCollectionContext = null;
+
+      const morandiGreens = [
+        '#7A9E7E', '#6B8F6B', '#5A7A5A', '#4E6E4E', '#6A7A5A',
+        '#7E8F6E', '#5E7A5E', '#4A6A4A', '#3E5E3E', '#567856',
+        '#6A8A5A', '#7A9A6A', '#5E7E4E', '#4E7A4E'
+      ];
+
+      const bodyEl = document.body;
+      const papers = {
+        write: document.getElementById('writePaper'),
+        draft: document.getElementById('draftPaper'),
+        collection: document.getElementById('collectionPaper')
+      };
+      const editorEl = document.getElementById('editor');
+      const titleInput = document.getElementById('docTitle');
+      const wordCountSpan = document.getElementById('wordCount');
+      const fontSizeSlider = document.getElementById('fontSizeSlider');
+      const lineHeightSlider = document.getElementById('lineHeightSlider');
+      const draftListDiv = document.getElementById('draftListContainer');
+      const collectionsDiv = document.getElementById('collectionsContainer');
+      const detailPanel = document.getElementById('collectionDetailPanel');
+      const tabs = document.querySelectorAll('.tab-btn');
+      const collectionBadge = document.getElementById('collectionBadge');
+      const pageNav = document.getElementById('pageNav');
+      const prevArticleBtn = document.getElementById('prevArticleBtn');
+      const nextArticleBtn = document.getElementById('nextArticleBtn');
+
+      // ---------- 数据持久化 ----------
+      function loadFromStorage() {
+        try {
+          const saved = localStorage.getItem('isle_writing_current');
+          if (saved) currentDoc = JSON.parse(saved);
+          titleInput.value = currentDoc.title || '';
+          editorEl.innerHTML = currentDoc.body || '';
+
+          const draftsSaved = localStorage.getItem('isle_drafts');
+          if (draftsSaved) drafts = JSON.parse(draftsSaved);
+
+          const collSaved = localStorage.getItem('isle_collections');
+          if (collSaved) collections = JSON.parse(collSaved);
+        } catch (e) { }
+      }
+
+      function saveCurrentDocToStorage() {
+        currentDoc.title = titleInput.value;
+        currentDoc.body = editorEl.innerHTML;
+        localStorage.setItem('isle_writing_current', JSON.stringify(currentDoc));
+      }
+
+      function saveDraftsToStorage() {
+        localStorage.setItem('isle_drafts', JSON.stringify(drafts));
+      }
+
+      function saveCollectionsToStorage() {
+        localStorage.setItem('isle_collections', JSON.stringify(collections));
+      }
+
+      // ---------- 辅助函数 ----------
+      function updateWordCount() {
+        const text = editorEl.innerText || '';
+        wordCountSpan.textContent = text.replace(/\s+/g, '').length + ' 字';
+      }
+
+      function resetEditState() {
+        currentDraftId = null;
+        currentCollectionSource = null;
+        currentCollectionContext = null;
+        hideCollectionContext();
+      }
+
+      function hideCollectionContext() {
+        collectionBadge.classList.remove('show');
+        pageNav.classList.remove('show');
+      }
+
+      function updateCollectionContextUI() {
+        if (currentCollectionContext) {
+          const coll = collections.find(c => c.id === currentCollectionContext.collectionId);
+          if (coll) {
+            collectionBadge.textContent = coll.name;
+            collectionBadge.classList.add('show');
+            pageNav.classList.add('show');
+          }
+        } else {
+          hideCollectionContext();
+        }
+      }
+
+      // ---------- 核心：智能保存（不再生成幽灵草稿） ----------
+      function smartSaveCurrent() {
+        const title = titleInput.value.trim();
+        const body = editorEl.innerHTML.trim();
+
+        // 情形1：正在编辑文集内文章 —— 不产生草稿
+        if (currentCollectionSource) {
+          return;
+        }
+
+        // 情形2：正在编辑一个已知草稿
+        if (currentDraftId) {
+          const draft = drafts.find(d => d.id === currentDraftId);
+          if (draft) {
+            if (title === '' && (body === '' || body === '<br>')) {
+              drafts = drafts.filter(d => d.id !== currentDraftId);
+              currentDraftId = null;
+            } else {
+              draft.title = title || '未命名';
+              draft.content = editorEl.innerHTML;
+            }
+            saveDraftsToStorage();
+            renderDrafts();
+          } else {
+            currentDraftId = null;
+          }
+          return;
+        }
+
+        // 情形3：普通空白页，有内容则自动创建新草稿
+        if (title !== '' || (body !== '' && body !== '<br>')) {
+          const autoId = Date.now() + '' + Math.random();
+          const timeStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+          const autoTitle = title || '自动保存 ' + timeStr;
+          drafts.push({
+            id: autoId,
+            title: autoTitle,
+            content: editorEl.innerHTML
+          });
+          currentDraftId = autoId;
+          saveDraftsToStorage();
+          renderDrafts();
+        }
+      }
+
+      // ---------- 渲染 ----------
+      function renderDrafts() {
+        if (drafts.length === 0) {
+          draftListDiv.innerHTML = '<div class="empty-placeholder">暂无草稿</div>';
+          return;
+        }
+        draftListDiv.innerHTML = drafts.map(d => `
+          <div class="entry-item">
+            <div class="entry-info">
+              <div class="entry-title">${d.title || '无标题'}</div>
+              <div class="entry-preview">${(d.content.replace(/<[^>]*>/g, '').substring(0, 28) || '空')}…</div>
+            </div>
+            <div class="flex-row">
+              <button class="btn" data-draft-id="${d.id}" data-action="loadDraft">载入</button>
+              <button class="btn" data-draft-id="${d.id}" data-action="renameDraft">命名</button>
+              <button class="btn btn-danger" data-draft-id="${d.id}" data-action="deleteDraft">删</button>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function renderCollections() {
+        if (collections.length === 0) {
+          collectionsDiv.innerHTML = '<div class="empty-placeholder">新建一个文集</div>';
+          return;
+        }
+        collectionsDiv.innerHTML = collections.map(c => `
+          <div class="folder-card" data-collection-id="${c.id}">
+            <div class="folder-cover" style="background: ${c.coverColor || '#5A6B4A'};">
+              <div class="folder-tab"></div>
+              <div class="folder-name" data-action="renameCollection">${c.name}</div>
+              <div class="folder-count">${c.items?.length || 0} 篇</div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function showCollectionDetail(collectionId) {
+        const coll = collections.find(c => c.id == collectionId);
+        if (!coll) return;
+        activeCollectionId = collectionId;
+        const items = coll.items || [];
+
+        let html = `
+          <div class="detail-header">
+            <span>${coll.name}</span>
+            <div class="detail-header-actions">
+              <button class="btn" id="closeDetailBtn">返回</button>
+              <button class="btn btn-danger" id="deleteCollectionBtn">删除文集</button>
+            </div>
+          </div>
+          <div class="articles-grid">
+        `;
+
+        if (items.length === 0) {
+          html += `<div class="zhaohua-xishi">朝花夕拾</div>`;
+        } else {
+          items.forEach((item, idx) => {
+            const plainText = item.content.replace(/<[^>]*>/g, '').substring(0, 80);
+            html += `
+              <div class="article-card" data-collection-id="${coll.id}" data-item-index="${idx}">
+                <div class="article-card-title">${item.title || '无标题'}</div>
+                <div class="article-card-preview">${plainText}${plainText.length >= 80 ? '…' : ''}</div>
+                <div class="article-card-actions">
+                  <button class="btn" data-action="renameArticle">命名</button>
+                  <button class="btn btn-danger" data-action="deleteArticle">删</button>
+                </div>
+              </div>
+            `;
+          });
+          if (items.length === 1) {
+            html += `<div class="zhaohua-xishi">朝花夕拾</div>`;
+          }
+        }
+
+        html += `</div>`;
+        detailPanel.innerHTML = html;
+        detailPanel.style.display = 'block';
+        collectionsDiv.style.display = 'none';
+        document.querySelector('.collection-footer').style.display = 'none';
+
+        document.getElementById('closeDetailBtn')?.addEventListener('click', () => {
+          detailPanel.style.display = 'none';
+          collectionsDiv.style.display = 'grid';
+          document.querySelector('.collection-footer').style.display = 'flex';
+          activeCollectionId = null;
+        });
+
+        document.getElementById('deleteCollectionBtn')?.addEventListener('click', () => {
+          if (confirm(`确定要删除文集「${coll.name}」吗？`)) {
+            collections = collections.filter(c => c.id != collectionId);
+            saveCollectionsToStorage();
+            detailPanel.style.display = 'none';
+            collectionsDiv.style.display = 'grid';
+            document.querySelector('.collection-footer').style.display = 'flex';
+            renderCollections();
+            activeCollectionId = null;
+            hideCollectionContext();
+            if (currentCollectionSource?.collectionId === collectionId) {
+              resetEditState();
+            }
+          }
+        });
+
+        detailPanel.querySelectorAll('.article-card').forEach(card => {
+          const cid = card.dataset.collectionId;
+          const idx = parseInt(card.dataset.itemIndex);
+          const collData = collections.find(c => c.id == cid);
+          const item = collData.items[idx];
+
+          card.addEventListener('click', (e) => {
+            if (e.target.closest('.btn')) return;
+            if (!currentCollectionSource) smartSaveCurrent();
+            titleInput.value = item.title || '';
+            editorEl.innerHTML = item.content || '';
+            currentDraftId = null;
+            currentCollectionSource = { collectionId: cid, itemIndex: idx };
+            currentCollectionContext = {
+              collectionId: cid,
+              items: collData.items,
+              currentIndex: idx
+            };
+            updateCollectionContextUI();
+            saveCurrentDocToStorage();
+            updateWordCount();
+            switchPaper('write');
+          });
+
+          card.querySelector('[data-action="loadArticle"]')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!currentCollectionSource) smartSaveCurrent();
+            titleInput.value = item.title || '';
+            editorEl.innerHTML = item.content || '';
+            currentDraftId = null;
+            currentCollectionSource = { collectionId: cid, itemIndex: idx };
+            currentCollectionContext = {
+              collectionId: cid,
+              items: collData.items,
+              currentIndex: idx
+            };
+            updateCollectionContextUI();
+            saveCurrentDocToStorage();
+            updateWordCount();
+            switchPaper('write');
+          });
+
+          card.querySelector('[data-action="renameArticle"]')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const n = prompt('新标题', item.title);
+            if (n) { item.title = n; saveCollectionsToStorage(); showCollectionDetail(collData.id); }
+          });
+
+          card.querySelector('[data-action="deleteArticle"]')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('确定删除这篇文章吗？')) {
+              collData.items.splice(idx, 1);
+              saveCollectionsToStorage();
+              showCollectionDetail(collData.id);
+              renderCollections();
+              if (currentCollectionSource &&
+                currentCollectionSource.collectionId === cid &&
+                currentCollectionSource.itemIndex === idx) {
+                resetEditState();
+                titleInput.value = '';
+                editorEl.innerHTML = '';
+                saveCurrentDocToStorage();
+                updateWordCount();
+              }
+              if (currentCollectionContext && currentCollectionContext.collectionId === collData.id) {
+                if (collData.items.length === 0) {
+                  hideCollectionContext();
+                  currentCollectionContext = null;
+                } else if (currentCollectionContext.currentIndex >= collData.items.length) {
+                  currentCollectionContext.currentIndex = collData.items.length - 1;
+                }
+              }
+            }
+          });
+        });
+      }
+
+      // ---------- 切换纸张 ----------
+      function switchPaper(tabId) {
+        Object.values(papers).forEach(p => p.classList.remove('active'));
+        papers[tabId].classList.add('active');
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+
+        if (tabId === 'draft') {
+          renderDrafts();
+          hideCollectionContext();
+        }
+        if (tabId === 'collection') {
+          renderCollections();
+          detailPanel.style.display = 'none';
+          collectionsDiv.style.display = 'grid';
+          document.querySelector('.collection-footer').style.display = 'flex';
+          activeCollectionId = null;
+          hideCollectionContext();
+        }
+        if (tabId === 'write') {
+          updateCollectionContextUI();
+        }
+      }
+
+      tabs.forEach(t => t.addEventListener('click', () => switchPaper(t.dataset.tab)));
+
+      collectionBadge.addEventListener('click', () => {
+        if (currentCollectionContext) {
+          switchPaper('collection');
+          showCollectionDetail(currentCollectionContext.collectionId);
+        }
+      });
+
+      // ---------- 新建空白页 ----------
+      function newBlankPage() {
+        if (!currentCollectionSource) {
+          smartSaveCurrent();
+        }
+        titleInput.value = '';
+        editorEl.innerHTML = '';
+        resetEditState();
+        saveCurrentDocToStorage();
+        updateWordCount();
+        titleInput.focus();
+      }
+
+      document.getElementById('newPageBtn').addEventListener('click', newBlankPage);
+
+      // ---------- 按钮事件 ----------
+      document.getElementById('saveCurrentBtn').addEventListener('click', () => {
+        saveCurrentDocToStorage();
+        alert('✓ 已保存当前内容到缓存');
+      });
+
+      document.getElementById('saveToDraftBtn').addEventListener('click', () => {
+        const newId = Date.now() + '' + Math.random();
+        drafts.push({
+          id: newId,
+          title: titleInput.value || '未命名',
+          content: editorEl.innerHTML
+        });
+        saveDraftsToStorage();
+        renderDrafts();
+        if (!currentCollectionSource) {
+          currentDraftId = newId;
+        }
+        alert('已存入草稿');
+      });
+
+      document.getElementById('saveToCollectionBtn').addEventListener('click', () => {
+        if (collections.length === 0) { alert('请先新建文集'); return; }
+        const name = prompt('输入要存入的文集名称');
+        const target = collections.find(c => c.name === name);
+        if (!target) { alert('未找到文集'); return; }
+        target.items.push({
+          title: titleInput.value || '未命名',
+          content: editorEl.innerHTML
+        });
+        saveCollectionsToStorage();
+        renderCollections();
+        alert('已存入文集');
+      });
+
+      function loadDraftById(draftId) {
+        const draft = drafts.find(d => d.id == draftId);
+        if (!draft) return;
+        if (!currentCollectionSource) smartSaveCurrent();
+        titleInput.value = draft.title;
+        editorEl.innerHTML = draft.content;
+        currentDraftId = draft.id;
+        currentCollectionSource = null;
+        currentCollectionContext = null;
+        hideCollectionContext();
+        saveCurrentDocToStorage();
+        updateWordCount();
+      }
+
+      draftListDiv.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const draftId = btn.dataset.draftId;
+        if (btn.dataset.action === 'loadDraft') {
+          loadDraftById(draftId);
+          switchPaper('write');
+        } else if (btn.dataset.action === 'renameDraft') {
+          const draft = drafts.find(d => d.id == draftId);
+          const n = prompt('新标题', draft.title);
+          if (n) { draft.title = n; saveDraftsToStorage(); renderDrafts(); }
+        } else if (btn.dataset.action === 'deleteDraft') {
+          drafts = drafts.filter(d => d.id != draftId);
+          if (currentDraftId === draftId) {
+            currentDraftId = null;
+          }
+          saveDraftsToStorage();
+          renderDrafts();
+        }
+      });
+
+      collectionsDiv.addEventListener('click', (e) => {
+        const card = e.target.closest('.folder-card');
+        if (!card) return;
+        const cid = card.dataset.collectionId;
+        const coll = collections.find(c => c.id == cid);
+        if (e.target.classList.contains('folder-name')) {
+          const n = prompt('新名称', coll.name);
+          if (n) { coll.name = n; saveCollectionsToStorage(); renderCollections(); }
+          e.stopPropagation();
+        } else {
+          showCollectionDetail(cid);
+        }
+      });
+
+      // 文集内翻页
+      prevArticleBtn.addEventListener('click', () => {
+        if (!currentCollectionContext) return;
+        const { items, currentIndex } = currentCollectionContext;
+        if (items.length === 0) return;
+        const newIndex = (currentIndex - 1 + items.length) % items.length;
+        const item = items[newIndex];
+        titleInput.value = item.title || '';
+        editorEl.innerHTML = item.content || '';
+        currentDraftId = null;
+        currentCollectionSource.collectionId = currentCollectionContext.collectionId;
+        currentCollectionSource.itemIndex = newIndex;
+        currentCollectionContext.currentIndex = newIndex;
+        saveCurrentDocToStorage();
+        updateWordCount();
+      });
+
+      nextArticleBtn.addEventListener('click', () => {
+        if (!currentCollectionContext) return;
+        const { items, currentIndex } = currentCollectionContext;
+        if (items.length === 0) return;
+        const newIndex = (currentIndex + 1) % items.length;
+        const item = items[newIndex];
+        titleInput.value = item.title || '';
+        editorEl.innerHTML = item.content || '';
+        currentDraftId = null;
+        currentCollectionSource.collectionId = currentCollectionContext.collectionId;
+        currentCollectionSource.itemIndex = newIndex;
+        currentCollectionContext.currentIndex = newIndex;
+        saveCurrentDocToStorage();
+        updateWordCount();
+      });
+
+      document.getElementById('newCollectionBtn').addEventListener('click', () => {
+        const name = prompt('文集名称');
+        if (!name) return;
+        collections.push({
+          id: Date.now() + '',
+          name,
+          coverColor: morandiGreens[Math.floor(Math.random() * morandiGreens.length)],
+          items: []
+        });
+        saveCollectionsToStorage();
+        renderCollections();
+      });
+
+      // ---------- 编辑器与标题输入事件 ----------
+      fontSizeSlider.addEventListener('input', () => editorEl.style.fontSize = fontSizeSlider.value + 'px');
+      lineHeightSlider.addEventListener('input', () => editorEl.style.lineHeight = lineHeightSlider.value);
+
+      function handleContentChange() {
+        updateWordCount();
+
+        if (currentCollectionSource) {
+          const { collectionId, itemIndex } = currentCollectionSource;
+          const coll = collections.find(c => c.id === collectionId);
+          if (coll && coll.items[itemIndex]) {
+            coll.items[itemIndex].title = titleInput.value || '未命名';
+            coll.items[itemIndex].content = editorEl.innerHTML;
+            saveCollectionsToStorage();
+          }
+          saveCurrentDocToStorage();
+          return;
+        }
+
+        if (currentDraftId) {
+          const draft = drafts.find(d => d.id === currentDraftId);
+          if (draft) {
+            draft.title = titleInput.value || '未命名';
+            draft.content = editorEl.innerHTML;
+            saveDraftsToStorage();
+          }
+          saveCurrentDocToStorage();
+          return;
+        }
+
+        saveCurrentDocToStorage();
+      }
+
+      editorEl.addEventListener('input', handleContentChange);
+      titleInput.addEventListener('input', handleContentChange);
+
+      editorEl.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        document.execCommand('insertText', false, text);
+      });
+
+      // 日夜切换
+      document.getElementById('themeToggle').addEventListener('click', () => bodyEl.classList.toggle('night-mode'));
+
+      // ---------- 导入导出 ----------
+      const signature = document.getElementById('signature');
+      const backupMenu = document.getElementById('backupMenu');
+      const exportBtn = document.getElementById('exportBackupBtn');
+      const importBtn = document.getElementById('importBackupBtn');
+      const importInput = document.getElementById('importBackupInput');
+
+      signature.addEventListener('click', (e) => {
+        e.stopPropagation();
+        backupMenu.classList.toggle('show');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!backupMenu.contains(e.target) && e.target !== signature) {
+          backupMenu.classList.remove('show');
+        }
+      });
+
+      exportBtn.addEventListener('click', () => {
+        const backup = {
+          currentDoc: { title: titleInput.value, body: editorEl.innerHTML },
+          drafts,
+          collections,
+          exportTime: new Date().toISOString()
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `写作之岛备份_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        backupMenu.classList.remove('show');
+      });
+
+      importBtn.addEventListener('click', () => {
+        importInput.click();
+        backupMenu.classList.remove('show');
+      });
+
+      importInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const backup = JSON.parse(ev.target.result);
+            if (backup.currentDoc) {
+              titleInput.value = backup.currentDoc.title || '';
+              editorEl.innerHTML = backup.currentDoc.body || '';
+            }
+            if (backup.drafts) drafts = backup.drafts;
+            if (backup.collections) collections = backup.collections;
+            saveCurrentDocToStorage();
+            saveDraftsToStorage();
+            saveCollectionsToStorage();
+            renderDrafts();
+            renderCollections();
+            updateWordCount();
+            resetEditState();
+            alert('备份已导入');
+          } catch (err) {
+            alert('文件格式错误');
+          }
+        };
+        reader.readAsText(file);
+        importInput.value = '';
+      });
+
+      // 初始化
+      loadFromStorage();
+      updateWordCount();
+      editorEl.style.fontSize = '16px';
+      editorEl.style.lineHeight = '2';
+      fontSizeSlider.value = 16;
+      lineHeightSlider.value = 2.0;
+      renderDrafts();
+      renderCollections();
+      resetEditState();
+    })();
+  </script>
+
+  <script>
+    // ========== 音乐播放器（极细进度条，无滑块） ==========
+    (function initMusicPlayer() {
+      const icon = document.getElementById('musicIcon');
+      const panel = document.getElementById('playerPanel');
+      const fileInput = document.getElementById('musicFileInput');
+      const prevBtn = document.getElementById('prevBtn');
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const modeBtn = document.getElementById('modeBtn');
+      const volumeSlider = document.getElementById('volumeSlider');
+      const progressSlider = document.getElementById('progressSlider');
+      const timeDisplay = document.getElementById('timeDisplay');
+      const trackInfo = document.getElementById('trackInfo');
+      const playlistContainer = document.getElementById('playlistContainer');
+
+      let audio = new Audio();
+      let playlist = [];
+      let currentIndex = -1;
+      let playMode = 'loop';
+
+      const symbols = { loop: '⟲', single: '⟳', random: '⇄' };
+      const names = { loop: '顺序循环', single: '单曲循环', random: '随机播放' };
+
+      try {
+        const saved = localStorage.getItem('isle_music_state');
+        if (saved) {
+          const state = JSON.parse(saved);
+          volumeSlider.value = state.volume || 0.5;
+          audio.volume = volumeSlider.value;
+          if (state.mode) playMode = state.mode;
+        }
+      } catch (e) { }
+
+      modeBtn.textContent = symbols[playMode];
+      modeBtn.title = names[playMode];
+
+      function formatTime(sec) {
+        if (isNaN(sec)) return '00:00';
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      }
+
+      function updateProgress() {
+        if (audio.duration) {
+          const percent = (audio.currentTime / audio.duration) * 100;
+          progressSlider.value = percent;
+          progressSlider.style.background = `linear-gradient(to right, #A3A87A 0%, #A3A87A ${percent}%, rgba(212, 207, 184, 0.2) ${percent}%, rgba(212, 207, 184, 0.2) 100%)`;
+          timeDisplay.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+        }
+      }
+
+      function saveState() {
+        localStorage.setItem('isle_music_state', JSON.stringify({ volume: audio.volume, mode: playMode }));
+      }
+
+      function renderPlaylist() {
+        if (playlist.length === 0) {
+          playlistContainer.innerHTML = '<div class="playlist-empty">点击 + 添加音乐</div>';
+          return;
+        }
+        let html = '';
+        playlist.forEach((file, idx) => {
+          html += `
+          <div class="playlist-item ${idx === currentIndex ? 'active-track' : ''}" draggable="true" data-index="${idx}">
+            <span class="playlist-item-name">${file.name}</span>
+            <div class="playlist-item-actions">
+              <button class="playlist-btn move-up" data-index="${idx}">↑</button>
+              <button class="playlist-btn move-down" data-index="${idx}">↓</button>
+              <button class="playlist-btn delete-track" data-index="${idx}">✕</button>
+            </div>
+          </div>
+        `;
+        });
+        playlistContainer.innerHTML = html;
+
+        playlistContainer.querySelectorAll('.move-up').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.index);
+            if (idx > 0) {
+              [playlist[idx - 1], playlist[idx]] = [playlist[idx], playlist[idx - 1]];
+              if (currentIndex === idx) currentIndex = idx - 1;
+              else if (currentIndex === idx - 1) currentIndex = idx;
+              renderPlaylist();
+            }
+          });
+        });
+
+        playlistContainer.querySelectorAll('.move-down').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.index);
+            if (idx < playlist.length - 1) {
+              [playlist[idx], playlist[idx + 1]] = [playlist[idx + 1], playlist[idx]];
+              if (currentIndex === idx) currentIndex = idx + 1;
+              else if (currentIndex === idx + 1) currentIndex = idx;
+              renderPlaylist();
+            }
+          });
+        });
+
+        playlistContainer.querySelectorAll('.delete-track').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = parseInt(btn.dataset.index);
+            playlist.splice(idx, 1);
+            if (currentIndex === idx) {
+              if (playlist.length === 0) {
+                currentIndex = -1;
+                audio.pause();
+                audio.src = '';
+                trackInfo.textContent = '未选择音乐';
+                playPauseBtn.textContent = '⏯';
+                progressSlider.value = 0;
+                progressSlider.style.background = 'rgba(212, 207, 184, 0.2)';
+                timeDisplay.textContent = '00:00 / 00:00';
+              } else {
+                currentIndex = Math.min(currentIndex, playlist.length - 1);
+                loadAndPlay(playlist[currentIndex]);
+              }
+            } else if (currentIndex > idx) {
+              currentIndex--;
+            }
+            renderPlaylist();
+          });
+        });
+
+        playlistContainer.querySelectorAll('.playlist-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            if (e.target.closest('.playlist-btn')) return;
+            const idx = parseInt(item.dataset.index);
+            if (idx !== currentIndex) {
+              currentIndex = idx;
+              loadAndPlay(playlist[currentIndex]);
+              renderPlaylist();
+            }
+          });
+        });
+
+        let dragSrcIndex = -1;
+        playlistContainer.querySelectorAll('.playlist-item').forEach(item => {
+          item.addEventListener('dragstart', (e) => {
+            dragSrcIndex = parseInt(item.dataset.index);
+            e.dataTransfer.effectAllowed = 'move';
+          });
+          item.addEventListener('dragover', (e) => e.preventDefault());
+          item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const target = e.target.closest('.playlist-item');
+            if (!target) return;
+            const dstIndex = parseInt(target.dataset.index);
+            if (dragSrcIndex !== -1 && dragSrcIndex !== dstIndex) {
+              const [moved] = playlist.splice(dragSrcIndex, 1);
+              playlist.splice(dstIndex, 0, moved);
+              if (currentIndex === dragSrcIndex) currentIndex = dstIndex;
+              else if (currentIndex > dragSrcIndex && currentIndex <= dstIndex) currentIndex--;
+              else if (currentIndex < dragSrcIndex && currentIndex >= dstIndex) currentIndex++;
+              renderPlaylist();
+            }
+          });
+        });
+      }
+
+      function loadAndPlay(file) {
+        const url = URL.createObjectURL(file);
+        audio.src = url;
+        audio.load();
+        audio.play().catch(() => { });
+        trackInfo.textContent = file.name;
+        playPauseBtn.textContent = '⏸';
+      }
+
+      icon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.classList.toggle('show');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!panel.contains(e.target) && e.target !== icon) {
+          panel.classList.remove('show');
+        }
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        playlist.push(...files);
+        if (currentIndex === -1) {
+          currentIndex = 0;
+          loadAndPlay(playlist[0]);
+        }
+        renderPlaylist();
+        panel.classList.add('show');
+        fileInput.value = '';
+      });
+
+      playPauseBtn.addEventListener('click', () => {
+        if (!audio.src && playlist.length > 0) {
+          currentIndex = 0;
+          loadAndPlay(playlist[0]);
+          renderPlaylist();
+          return;
+        }
+        if (audio.paused) {
+          audio.play();
+          playPauseBtn.textContent = '⏸';
+        } else {
+          audio.pause();
+          playPauseBtn.textContent = '⏯';
+        }
+      });
+
+      prevBtn.addEventListener('click', () => {
+        if (playlist.length === 0) return;
+        if (playMode === 'random') {
+          currentIndex = Math.floor(Math.random() * playlist.length);
+        } else {
+          currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+        }
+        loadAndPlay(playlist[currentIndex]);
+        renderPlaylist();
+      });
+
+      nextBtn.addEventListener('click', () => {
+        if (playlist.length === 0) return;
+        if (playMode === 'random') {
+          currentIndex = Math.floor(Math.random() * playlist.length);
+        } else {
+          currentIndex = (currentIndex + 1) % playlist.length;
+        }
+        loadAndPlay(playlist[currentIndex]);
+        renderPlaylist();
+      });
+
+      modeBtn.addEventListener('click', () => {
+        const modes = ['loop', 'single', 'random'];
+        const idx = (modes.indexOf(playMode) + 1) % modes.length;
+        playMode = modes[idx];
+        modeBtn.textContent = symbols[playMode];
+        modeBtn.title = names[playMode];
+        saveState();
+      });
+
+      audio.addEventListener('ended', () => {
+        if (playlist.length === 0) return;
+        if (playMode === 'single') {
+          audio.currentTime = 0;
+          audio.play();
+        } else if (playMode === 'random') {
+          currentIndex = Math.floor(Math.random() * playlist.length);
+          loadAndPlay(playlist[currentIndex]);
+          renderPlaylist();
+        } else {
+          currentIndex = (currentIndex + 1) % playlist.length;
+          loadAndPlay(playlist[currentIndex]);
+          renderPlaylist();
+        }
+      });
+
+      audio.addEventListener('timeupdate', updateProgress);
+      audio.addEventListener('loadedmetadata', updateProgress);
+
+      progressSlider.addEventListener('input', () => {
+        if (audio.duration) {
+          audio.currentTime = (progressSlider.value / 100) * audio.duration;
+        }
+      });
+
+      volumeSlider.addEventListener('input', () => {
+        audio.volume = volumeSlider.value;
+        saveState();
+      });
+
+      audio.volume = volumeSlider.value;
+      renderPlaylist();
+      progressSlider.style.background = 'rgba(212, 207, 184, 0.2)';
+    })();
+  </script>
+</body>
+
+</html>
