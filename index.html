@@ -626,16 +626,15 @@
       opacity: 0.85;
     }
 
-    /* ========== 文集内页大外框 —— 恢复左侧色带，提亮 ========== */
+    /* ========== 文集内页大外框 ========== */
     .collection-detail-panel {
       margin-top: 16px;
       padding: 1.5rem 1.8rem 1.5rem 2.2rem;
       background: #f5f0e5;
-      /* 提亮的暖米色 */
       border-left: 10px solid #6E7F4E;
-      /* 左侧色带 */
       border-radius: 8px 16px 16px 8px;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(210, 190, 160, 0.2);
+      min-height: 300px;
     }
 
     body.night-mode .collection-detail-panel {
@@ -647,6 +646,8 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 1.8rem;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .detail-header span {
@@ -661,7 +662,7 @@
       gap: 10px;
     }
 
-    /* 文章卡片 —— 横线信纸，提亮，更方正 */
+    /* 文章卡片 */
     .articles-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -715,7 +716,6 @@
       margin-bottom: 16px;
     }
 
-    /* 按钮组 —— 底部，与文字分开 */
     .article-card-actions {
       display: flex;
       gap: 8px;
@@ -745,12 +745,25 @@
       letter-spacing: 4px;
     }
 
+    .zhaohua-xishi-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 8rem 0;
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      font-size: 1.2rem;
+      font-style: italic;
+      color: #7A6A5A;
+      opacity: 0.2;
+      letter-spacing: 4px;
+    }
+
     .collection-footer {
       margin-top: auto;
       display: flex;
       justify-content: flex-end;
       padding-top: 24px;
       padding-right: 16px;
+      gap: 10px;
     }
 
     .flex-row {
@@ -847,7 +860,6 @@
       text-align: center;
     }
 
-    /* 进度条 —— 极细线，无滑块 */
     .progress-container {
       display: flex;
       align-items: center;
@@ -1113,20 +1125,23 @@
   <div class="theme-toggle" id="themeToggle">日 / 夜</div>
 
   <script>
-    // ========== 写作核心功能（修复草稿幽灵问题） ==========
+    // ========== 写作核心功能 ==========
     (function () {
+      // ---------- 状态变量 ----------
+      // currentDoc: 仅用作 localStorage 缓存恢复，不代表编辑模式
       let currentDoc = { title: '', body: '' };
-      let currentDraftId = null;
-      let currentCollectionSource = null;
+      // 编辑模式追踪：null = 自由编辑, 'draft' = 编辑草稿, 'collection' = 编辑文集文章
+      let editMode = null; // { type: 'draft', draftId: string } | { type: 'collection', collectionId: string, itemIndex: number } | null
       let drafts = [];
       let collections = [];
       let activeCollectionId = null;
-      let currentCollectionContext = null;
+      // 文集翻页上下文
+      let collectionContext = null; // { collectionId: string, items: array, currentIndex: number }
 
       const morandiGreens = [
-        '#7A9E7E', '#6B8F6B', '#5A7A5A', '#4E6E4E', '#6A7A5A',
-        '#7E8F6E', '#5E7A5E', '#4A6A4A', '#3E5E3E', '#567856',
-        '#6A8A5A', '#7A9A6A', '#5E7E4E', '#4E7A4E'
+        '#3A5E3E', '#355E3C', '#53754A', '#426544', '#6D8E75',
+        '#648A76', '#426B47', '#83A973', '#598A4D', '#597A59',
+        '#7B9B6A'
       ];
 
       const bodyEl = document.body;
@@ -1185,10 +1200,22 @@
         wordCountSpan.textContent = text.replace(/\s+/g, '').length + ' 字';
       }
 
-      function resetEditState() {
-        currentDraftId = null;
-        currentCollectionSource = null;
-        currentCollectionContext = null;
+      function getEditorContent() {
+        return {
+          title: titleInput.value.trim() || '未命名',
+          body: editorEl.innerHTML
+        };
+      }
+
+      function setEditorContent(title, body) {
+        titleInput.value = title || '';
+        editorEl.innerHTML = body || '';
+        updateWordCount();
+      }
+
+      function resetEditMode() {
+        editMode = null;
+        collectionContext = null;
         hideCollectionContext();
       }
 
@@ -1198,8 +1225,8 @@
       }
 
       function updateCollectionContextUI() {
-        if (currentCollectionContext) {
-          const coll = collections.find(c => c.id === currentCollectionContext.collectionId);
+        if (collectionContext && editMode?.type === 'collection') {
+          const coll = collections.find(c => c.id === collectionContext.collectionId);
           if (coll) {
             collectionBadge.textContent = coll.name;
             collectionBadge.classList.add('show');
@@ -1210,48 +1237,71 @@
         }
       }
 
-      // ---------- 核心：智能保存（不再生成幽灵草稿） ----------
-      function smartSaveCurrent() {
-        const title = titleInput.value.trim();
-        const body = editorEl.innerHTML.trim();
+      // ---------- 核心保存逻辑（根据 editMode 保存到正确位置） ----------
+      function saveToCorrectLocation() {
+        const { title, body } = getEditorContent();
 
-        // 情形1：正在编辑文集内文章 —— 不产生草稿
-        if (currentCollectionSource) {
-          return;
-        }
-
-        // 情形2：正在编辑一个已知草稿
-        if (currentDraftId) {
-          const draft = drafts.find(d => d.id === currentDraftId);
-          if (draft) {
-            if (title === '' && (body === '' || body === '<br>')) {
-              drafts = drafts.filter(d => d.id !== currentDraftId);
-              currentDraftId = null;
-            } else {
-              draft.title = title || '未命名';
-              draft.content = editorEl.innerHTML;
-            }
-            saveDraftsToStorage();
-            renderDrafts();
-          } else {
-            currentDraftId = null;
+        if (editMode?.type === 'collection') {
+          // 保存到文集
+          const coll = collections.find(c => c.id === editMode.collectionId);
+          if (coll && coll.items[editMode.itemIndex]) {
+            coll.items[editMode.itemIndex].title = title;
+            coll.items[editMode.itemIndex].content = body;
+            saveCollectionsToStorage();
           }
-          return;
+          // 同时更新翻页上下文
+          if (collectionContext && collectionContext.collectionId === editMode.collectionId) {
+            collectionContext.items = coll ? [...coll.items] : [];
+            if (collectionContext.currentIndex >= collectionContext.items.length) {
+              collectionContext.currentIndex = Math.max(0, collectionContext.items.length - 1);
+            }
+          }
+        } else if (editMode?.type === 'draft') {
+          // 保存到草稿
+          const draft = drafts.find(d => d.id === editMode.draftId);
+          if (draft) {
+            draft.title = title;
+            draft.content = body;
+            saveDraftsToStorage();
+          } else {
+            // 草稿已被删除，回退为自由模式
+            resetEditMode();
+          }
         }
+        // 自由模式（editMode === null）：只存 localStorage 缓存
+        saveCurrentDocToStorage();
+      }
 
-        // 情形3：普通空白页，有内容则自动创建新草稿
-        if (title !== '' || (body !== '' && body !== '<br>')) {
-          const autoId = Date.now() + '' + Math.random();
+      // ---------- 自动存草稿（自由编辑内容 → 转为草稿） ----------
+      function autoSaveToDraft() {
+        if (editMode !== null) return; // 已有归属，不需要自动存草稿
+
+        const { title, body } = getEditorContent();
+        const bodyIsEmpty = body === '' || body === '<br>' || body === '<br />';
+
+        if (!bodyIsEmpty || title !== '未命名') {
+          // 有内容，创建草稿
+          const autoId = 'draft_' + Date.now();
           const timeStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-          const autoTitle = title || '自动保存 ' + timeStr;
+          const draftTitle = title !== '未命名' ? title : '自动保存 ' + timeStr;
           drafts.push({
             id: autoId,
-            title: autoTitle,
-            content: editorEl.innerHTML
+            title: draftTitle,
+            content: body
           });
-          currentDraftId = autoId;
+          editMode = { type: 'draft', draftId: autoId };
           saveDraftsToStorage();
           renderDrafts();
+        }
+        // 如果完全为空，不产生草稿
+      }
+
+      // ---------- 切换操作前的保存 ----------
+      function saveBeforeNavigate() {
+        saveToCorrectLocation();
+        // 如果是自由编辑且有内容，自动转为草稿
+        if (editMode === null) {
+          autoSaveToDraft();
         }
       }
 
@@ -1264,8 +1314,8 @@
         draftListDiv.innerHTML = drafts.map(d => `
           <div class="entry-item">
             <div class="entry-info">
-              <div class="entry-title">${d.title || '无标题'}</div>
-              <div class="entry-preview">${(d.content.replace(/<[^>]*>/g, '').substring(0, 28) || '空')}…</div>
+              <div class="entry-title">${escapeHtml(d.title || '无标题')}</div>
+              <div class="entry-preview">${escapeHtml((d.content.replace(/<[^>]*>/g, '').substring(0, 28) || '空'))}…</div>
             </div>
             <div class="flex-row">
               <button class="btn" data-draft-id="${d.id}" data-action="loadDraft">载入</button>
@@ -1274,6 +1324,12 @@
             </div>
           </div>
         `).join('');
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
       }
 
       function renderCollections() {
@@ -1285,7 +1341,7 @@
           <div class="folder-card" data-collection-id="${c.id}">
             <div class="folder-cover" style="background: ${c.coverColor || '#5A6B4A'};">
               <div class="folder-tab"></div>
-              <div class="folder-name" data-action="renameCollection">${c.name}</div>
+              <div class="folder-name" data-action="renameCollection">${escapeHtml(c.name)}</div>
               <div class="folder-count">${c.items?.length || 0} 篇</div>
             </div>
           </div>
@@ -1300,10 +1356,11 @@
 
         let html = `
           <div class="detail-header">
-            <span>${coll.name}</span>
+            <span>${escapeHtml(coll.name)}</span>
             <div class="detail-header-actions">
+              <button class="btn" id="newArticleInCollectionBtn">＋ 新建文章</button>
               <button class="btn" id="closeDetailBtn">返回</button>
-              <button class="btn btn-danger" id="deleteCollectionBtn">删除文集</button>
+              <button class="btn btn-danger" id="deleteCollectionBtn" style="opacity: 0.9;">删除文集</button>
             </div>
           </div>
           <div class="articles-grid">
@@ -1315,27 +1372,26 @@
           items.forEach((item, idx) => {
             const plainText = item.content.replace(/<[^>]*>/g, '').substring(0, 80);
             html += `
-              <div class="article-card" data-collection-id="${coll.id}" data-item-index="${idx}">
-                <div class="article-card-title">${item.title || '无标题'}</div>
-                <div class="article-card-preview">${plainText}${plainText.length >= 80 ? '…' : ''}</div>
-                <div class="article-card-actions">
-                  <button class="btn" data-action="renameArticle">命名</button>
-                  <button class="btn btn-danger" data-action="deleteArticle">删</button>
-                </div>
-              </div>
-            `;
+      <div class="article-card" data-collection-id="${coll.id}" data-item-index="${idx}">
+        <div class="article-card-title">${escapeHtml(item.title || '无标题')}</div>
+        <div class="article-card-preview">${escapeHtml(plainText)}${plainText.length >= 80 ? '…' : ''}</div>
+        <div class="article-card-actions">
+          <button class="btn" data-action="renameArticle">命名</button>
+          <button class="btn btn-danger" data-action="deleteArticle">删</button>
+        </div>
+      </div>
+    `;
           });
-          if (items.length === 1) {
-            html += `<div class="zhaohua-xishi">朝花夕拾</div>`;
-          }
+          // 有文章时底部才加朝花夕拾
+          html += `<div class="zhaohua-xishi">朝花夕拾</div>`;
         }
-
         html += `</div>`;
         detailPanel.innerHTML = html;
         detailPanel.style.display = 'block';
         collectionsDiv.style.display = 'none';
         document.querySelector('.collection-footer').style.display = 'none';
 
+        // 关闭详情
         document.getElementById('closeDetailBtn')?.addEventListener('click', () => {
           detailPanel.style.display = 'none';
           collectionsDiv.style.display = 'grid';
@@ -1343,22 +1399,53 @@
           activeCollectionId = null;
         });
 
+        // 删除文集
         document.getElementById('deleteCollectionBtn')?.addEventListener('click', () => {
           if (confirm(`确定要删除文集「${coll.name}」吗？`)) {
-            collections = collections.filter(c => c.id != collectionId);
+            const wasEditingThis = editMode?.type === 'collection' && editMode.collectionId === coll.id;
+            collections = collections.filter(c => c.id != coll.id);
             saveCollectionsToStorage();
             detailPanel.style.display = 'none';
             collectionsDiv.style.display = 'grid';
             document.querySelector('.collection-footer').style.display = 'flex';
             renderCollections();
             activeCollectionId = null;
-            hideCollectionContext();
-            if (currentCollectionSource?.collectionId === collectionId) {
-              resetEditState();
+            if (wasEditingThis) {
+              resetEditMode();
+              setEditorContent('', '');
+              saveCurrentDocToStorage();
+            }
+            if (collectionContext?.collectionId === coll.id) {
+              collectionContext = null;
+              hideCollectionContext();
             }
           }
         });
 
+        // ⭐ 文集内新建文章
+        document.getElementById('newArticleInCollectionBtn')?.addEventListener('click', () => {
+          saveBeforeNavigate();
+          const newTitle = '新文章';
+          const newBody = '';
+          coll.items.push({ title: newTitle, content: newBody });
+          const newIndex = coll.items.length - 1;
+          saveCollectionsToStorage();
+
+          // 切换到写作页，编辑这篇新文章
+          editMode = { type: 'collection', collectionId: coll.id, itemIndex: newIndex };
+          collectionContext = {
+            collectionId: coll.id,
+            items: [...coll.items],
+            currentIndex: newIndex
+          };
+          setEditorContent(newTitle, newBody);
+          saveCurrentDocToStorage();
+          updateCollectionContextUI();
+          switchPaper('write');
+          titleInput.focus();
+        });
+
+        // 文章卡片点击
         detailPanel.querySelectorAll('.article-card').forEach(card => {
           const cid = card.dataset.collectionId;
           const idx = parseInt(card.dataset.itemIndex);
@@ -1367,70 +1454,78 @@
 
           card.addEventListener('click', (e) => {
             if (e.target.closest('.btn')) return;
-            if (!currentCollectionSource) smartSaveCurrent();
-            titleInput.value = item.title || '';
-            editorEl.innerHTML = item.content || '';
-            currentDraftId = null;
-            currentCollectionSource = { collectionId: cid, itemIndex: idx };
-            currentCollectionContext = {
+            saveBeforeNavigate();
+            editMode = { type: 'collection', collectionId: cid, itemIndex: idx };
+            collectionContext = {
               collectionId: cid,
-              items: collData.items,
+              items: [...collData.items],
               currentIndex: idx
             };
-            updateCollectionContextUI();
+            setEditorContent(item.title || '', item.content || '');
             saveCurrentDocToStorage();
-            updateWordCount();
+            updateCollectionContextUI();
             switchPaper('write');
           });
 
-          card.querySelector('[data-action="loadArticle"]')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!currentCollectionSource) smartSaveCurrent();
-            titleInput.value = item.title || '';
-            editorEl.innerHTML = item.content || '';
-            currentDraftId = null;
-            currentCollectionSource = { collectionId: cid, itemIndex: idx };
-            currentCollectionContext = {
-              collectionId: cid,
-              items: collData.items,
-              currentIndex: idx
-            };
-            updateCollectionContextUI();
-            saveCurrentDocToStorage();
-            updateWordCount();
-            switchPaper('write');
-          });
-
+          // 命名文章
           card.querySelector('[data-action="renameArticle"]')?.addEventListener('click', (e) => {
             e.stopPropagation();
             const n = prompt('新标题', item.title);
-            if (n) { item.title = n; saveCollectionsToStorage(); showCollectionDetail(collData.id); }
+            if (n && n.trim()) {
+              item.title = n.trim();
+              // 如果正在编辑这篇文章，同步更新 editMode 和编辑器
+              if (editMode?.type === 'collection' &&
+                editMode.collectionId === collData.id &&
+                editMode.itemIndex === idx) {
+                titleInput.value = item.title;
+                saveCurrentDocToStorage();
+              }
+              saveCollectionsToStorage();
+              showCollectionDetail(collData.id);
+            }
           });
 
+          // 删除文章
           card.querySelector('[data-action="deleteArticle"]')?.addEventListener('click', (e) => {
             e.stopPropagation();
             if (confirm('确定删除这篇文章吗？')) {
-              collData.items.splice(idx, 1);
+              const deletedIndex = idx;
+              collData.items.splice(deletedIndex, 1);
               saveCollectionsToStorage();
-              showCollectionDetail(collData.id);
-              renderCollections();
-              if (currentCollectionSource &&
-                currentCollectionSource.collectionId === cid &&
-                currentCollectionSource.itemIndex === idx) {
-                resetEditState();
-                titleInput.value = '';
-                editorEl.innerHTML = '';
-                saveCurrentDocToStorage();
-                updateWordCount();
-              }
-              if (currentCollectionContext && currentCollectionContext.collectionId === collData.id) {
-                if (collData.items.length === 0) {
-                  hideCollectionContext();
-                  currentCollectionContext = null;
-                } else if (currentCollectionContext.currentIndex >= collData.items.length) {
-                  currentCollectionContext.currentIndex = collData.items.length - 1;
+
+              // 调整 editMode
+              if (editMode?.type === 'collection' && editMode.collectionId === collData.id) {
+                if (editMode.itemIndex === deletedIndex) {
+                  // 删除的正是当前编辑的文章
+                  resetEditMode();
+                  setEditorContent('', '');
+                  saveCurrentDocToStorage();
+                } else if (editMode.itemIndex > deletedIndex) {
+                  // 删除的文章在当前文章之前，索引减一
+                  editMode.itemIndex--;
                 }
               }
+
+              // 调整 collectionContext
+              if (collectionContext?.collectionId === collData.id) {
+                if (collectionContext.currentIndex === deletedIndex) {
+                  collectionContext = null;
+                  hideCollectionContext();
+                } else if (collectionContext.currentIndex > deletedIndex) {
+                  collectionContext.currentIndex--;
+                }
+                if (collectionContext && collectionContext.currentIndex >= collData.items.length) {
+                  collectionContext.currentIndex = Math.max(0, collData.items.length - 1);
+                }
+                if (collData.items.length === 0) {
+                  collectionContext = null;
+                  hideCollectionContext();
+                }
+                collectionContext.items = [...collData.items];
+              }
+
+              showCollectionDetail(collData.id);
+              renderCollections();
             }
           });
         });
@@ -1459,100 +1554,156 @@
         }
       }
 
-      tabs.forEach(t => t.addEventListener('click', () => switchPaper(t.dataset.tab)));
+      tabs.forEach(t => t.addEventListener('click', () => {
+        const targetTab = t.dataset.tab;
+        if (targetTab !== 'write') {
+          saveBeforeNavigate();
+        }
+        switchPaper(targetTab);
+      }));
 
       collectionBadge.addEventListener('click', () => {
-        if (currentCollectionContext) {
+        if (collectionContext) {
           switchPaper('collection');
-          showCollectionDetail(currentCollectionContext.collectionId);
+          showCollectionDetail(collectionContext.collectionId);
         }
       });
 
       // ---------- 新建空白页 ----------
       function newBlankPage() {
-        if (!currentCollectionSource) {
-          smartSaveCurrent();
-        }
-        titleInput.value = '';
-        editorEl.innerHTML = '';
-        resetEditState();
+        saveBeforeNavigate(); // 先保存当前内容（含自动转草稿）
+        resetEditMode();
+        setEditorContent('', '');
         saveCurrentDocToStorage();
-        updateWordCount();
         titleInput.focus();
       }
 
       document.getElementById('newPageBtn').addEventListener('click', newBlankPage);
 
       // ---------- 按钮事件 ----------
+      // 保存此页（心理安慰，实际已自动保存）
       document.getElementById('saveCurrentBtn').addEventListener('click', () => {
+        saveToCorrectLocation();
         saveCurrentDocToStorage();
-        alert('✓ 已保存当前内容到缓存');
       });
 
+      // 存入草稿
       document.getElementById('saveToDraftBtn').addEventListener('click', () => {
-        const newId = Date.now() + '' + Math.random();
+        const { title, body } = getEditorContent();
+        const newId = 'draft_' + Date.now();
         drafts.push({
           id: newId,
-          title: titleInput.value || '未命名',
-          content: editorEl.innerHTML
+          title: title,
+          content: body
         });
         saveDraftsToStorage();
         renderDrafts();
-        if (!currentCollectionSource) {
-          currentDraftId = newId;
-        }
-        alert('已存入草稿');
+        // 切换到草稿编辑模式
+        editMode = { type: 'draft', draftId: newId };
+        saveCurrentDocToStorage();
       });
 
+      // 存入文集
       document.getElementById('saveToCollectionBtn').addEventListener('click', () => {
-        if (collections.length === 0) { alert('请先新建文集'); return; }
-        const name = prompt('输入要存入的文集名称');
-        const target = collections.find(c => c.name === name);
-        if (!target) { alert('未找到文集'); return; }
-        target.items.push({
-          title: titleInput.value || '未命名',
-          content: editorEl.innerHTML
-        });
+        if (collections.length === 0) {
+          // 没有文集，引导创建
+          const name = prompt('还没有文集，请输入新文集名称：');
+          if (!name || !name.trim()) return;
+          const newColl = {
+            id: 'coll_' + Date.now(),
+            name: name.trim(),
+            coverColor: morandiGreens[Math.floor(Math.random() * morandiGreens.length)],
+            items: []
+          };
+          collections.push(newColl);
+          saveCollectionsToStorage();
+          renderCollections();
+
+          const { title, body } = getEditorContent();
+          newColl.items.push({ title: title, content: body });
+          saveCollectionsToStorage();
+          editMode = { type: 'collection', collectionId: newColl.id, itemIndex: 0 };
+          collectionContext = {
+            collectionId: newColl.id,
+            items: [...newColl.items],
+            currentIndex: 0
+          };
+          updateCollectionContextUI();
+          saveCurrentDocToStorage();
+          return;
+        }
+
+        // 让用户选择文集
+        const collNames = collections.map(c => c.name).join('、');
+        const name = prompt(`要存入哪个文集？\n（现有：${collNames}）`);
+        if (!name || !name.trim()) return;
+        const target = collections.find(c => c.name === name.trim());
+        if (!target) {
+          alert('未找到该文集，请先创建。');
+          return;
+        }
+
+        const { title, body } = getEditorContent();
+        target.items.push({ title: title, content: body });
+        const newIndex = target.items.length - 1;
         saveCollectionsToStorage();
         renderCollections();
-        alert('已存入文集');
+
+        // ⭐ 关键：切换到文集编辑模式，后续编辑直接保存到该文集
+        editMode = { type: 'collection', collectionId: target.id, itemIndex: newIndex };
+        collectionContext = {
+          collectionId: target.id,
+          items: [...target.items],
+          currentIndex: newIndex
+        };
+        updateCollectionContextUI();
+        saveCurrentDocToStorage();
       });
 
-      function loadDraftById(draftId) {
-        const draft = drafts.find(d => d.id == draftId);
-        if (!draft) return;
-        if (!currentCollectionSource) smartSaveCurrent();
-        titleInput.value = draft.title;
-        editorEl.innerHTML = draft.content;
-        currentDraftId = draft.id;
-        currentCollectionSource = null;
-        currentCollectionContext = null;
-        hideCollectionContext();
-        saveCurrentDocToStorage();
-        updateWordCount();
-      }
-
+      // 草稿列表事件
       draftListDiv.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
         const draftId = btn.dataset.draftId;
+
         if (btn.dataset.action === 'loadDraft') {
-          loadDraftById(draftId);
+          saveBeforeNavigate();
+          const draft = drafts.find(d => d.id == draftId);
+          if (!draft) return;
+          editMode = { type: 'draft', draftId: draft.id };
+          resetEditMode(); // 清除可能的 collection 状态
+          editMode = { type: 'draft', draftId: draft.id };
+          setEditorContent(draft.title, draft.content);
+          saveCurrentDocToStorage();
           switchPaper('write');
         } else if (btn.dataset.action === 'renameDraft') {
           const draft = drafts.find(d => d.id == draftId);
           const n = prompt('新标题', draft.title);
-          if (n) { draft.title = n; saveDraftsToStorage(); renderDrafts(); }
-        } else if (btn.dataset.action === 'deleteDraft') {
-          drafts = drafts.filter(d => d.id != draftId);
-          if (currentDraftId === draftId) {
-            currentDraftId = null;
+          if (n && n.trim()) {
+            draft.title = n.trim();
+            if (editMode?.type === 'draft' && editMode.draftId === draftId) {
+              titleInput.value = draft.title;
+              saveCurrentDocToStorage();
+            }
+            saveDraftsToStorage();
+            renderDrafts();
           }
-          saveDraftsToStorage();
-          renderDrafts();
+        } else if (btn.dataset.action === 'deleteDraft') {
+          if (confirm('确定删除这份草稿吗？')) {
+            const wasEditing = editMode?.type === 'draft' && editMode.draftId === draftId;
+            drafts = drafts.filter(d => d.id != draftId);
+            saveDraftsToStorage();
+            renderDrafts();
+            if (wasEditing) {
+              resetEditMode();
+              setEditorContent('', '');
+              saveCurrentDocToStorage();
+            }
+          }
         }
       });
 
+      // 文集列表事件
       collectionsDiv.addEventListener('click', (e) => {
         const card = e.target.closest('.folder-card');
         if (!card) return;
@@ -1560,52 +1711,55 @@
         const coll = collections.find(c => c.id == cid);
         if (e.target.classList.contains('folder-name')) {
           const n = prompt('新名称', coll.name);
-          if (n) { coll.name = n; saveCollectionsToStorage(); renderCollections(); }
+          if (n && n.trim()) {
+            coll.name = n.trim();
+            saveCollectionsToStorage();
+            renderCollections();
+            if (editMode?.type === 'collection' && editMode.collectionId === coll.id) {
+              updateCollectionContextUI();
+            }
+          }
           e.stopPropagation();
         } else {
+          saveBeforeNavigate();
           showCollectionDetail(cid);
         }
       });
 
       // 文集内翻页
       prevArticleBtn.addEventListener('click', () => {
-        if (!currentCollectionContext) return;
-        const { items, currentIndex } = currentCollectionContext;
+        if (!collectionContext || editMode?.type !== 'collection') return;
+        const { items, currentIndex } = collectionContext;
         if (items.length === 0) return;
+        saveToCorrectLocation();
         const newIndex = (currentIndex - 1 + items.length) % items.length;
         const item = items[newIndex];
-        titleInput.value = item.title || '';
-        editorEl.innerHTML = item.content || '';
-        currentDraftId = null;
-        currentCollectionSource.collectionId = currentCollectionContext.collectionId;
-        currentCollectionSource.itemIndex = newIndex;
-        currentCollectionContext.currentIndex = newIndex;
+        editMode.itemIndex = newIndex;
+        collectionContext.currentIndex = newIndex;
+        setEditorContent(item.title || '', item.content || '');
         saveCurrentDocToStorage();
-        updateWordCount();
       });
 
       nextArticleBtn.addEventListener('click', () => {
-        if (!currentCollectionContext) return;
-        const { items, currentIndex } = currentCollectionContext;
+        if (!collectionContext || editMode?.type !== 'collection') return;
+        const { items, currentIndex } = collectionContext;
         if (items.length === 0) return;
+        saveToCorrectLocation();
         const newIndex = (currentIndex + 1) % items.length;
         const item = items[newIndex];
-        titleInput.value = item.title || '';
-        editorEl.innerHTML = item.content || '';
-        currentDraftId = null;
-        currentCollectionSource.collectionId = currentCollectionContext.collectionId;
-        currentCollectionSource.itemIndex = newIndex;
-        currentCollectionContext.currentIndex = newIndex;
+        editMode.itemIndex = newIndex;
+        collectionContext.currentIndex = newIndex;
+        setEditorContent(item.title || '', item.content || '');
         saveCurrentDocToStorage();
-        updateWordCount();
       });
 
+      // 新建文集
       document.getElementById('newCollectionBtn').addEventListener('click', () => {
         const name = prompt('文集名称');
-        if (!name) return;
+        if (!name || !name.trim()) return;
         collections.push({
-          id: Date.now() + '',
-          name,
+          id: 'coll_' + Date.now(),
+          name: name.trim(),
           coverColor: morandiGreens[Math.floor(Math.random() * morandiGreens.length)],
           items: []
         });
@@ -1619,31 +1773,7 @@
 
       function handleContentChange() {
         updateWordCount();
-
-        if (currentCollectionSource) {
-          const { collectionId, itemIndex } = currentCollectionSource;
-          const coll = collections.find(c => c.id === collectionId);
-          if (coll && coll.items[itemIndex]) {
-            coll.items[itemIndex].title = titleInput.value || '未命名';
-            coll.items[itemIndex].content = editorEl.innerHTML;
-            saveCollectionsToStorage();
-          }
-          saveCurrentDocToStorage();
-          return;
-        }
-
-        if (currentDraftId) {
-          const draft = drafts.find(d => d.id === currentDraftId);
-          if (draft) {
-            draft.title = titleInput.value || '未命名';
-            draft.content = editorEl.innerHTML;
-            saveDraftsToStorage();
-          }
-          saveCurrentDocToStorage();
-          return;
-        }
-
-        saveCurrentDocToStorage();
+        saveToCorrectLocation();
       }
 
       editorEl.addEventListener('input', handleContentChange);
@@ -1653,6 +1783,11 @@
         e.preventDefault();
         const text = (e.clipboardData || window.clipboardData).getData('text/plain');
         document.execCommand('insertText', false, text);
+      });
+
+      // 页面离开时保存
+      window.addEventListener('beforeunload', () => {
+        saveToCorrectLocation();
       });
 
       // 日夜切换
@@ -1677,6 +1812,7 @@
       });
 
       exportBtn.addEventListener('click', () => {
+        saveToCorrectLocation();
         const backup = {
           currentDoc: { title: titleInput.value, body: editorEl.innerHTML },
           drafts,
@@ -1717,8 +1853,7 @@
             renderDrafts();
             renderCollections();
             updateWordCount();
-            resetEditState();
-            alert('备份已导入');
+            resetEditMode();
           } catch (err) {
             alert('文件格式错误');
           }
@@ -1736,12 +1871,12 @@
       lineHeightSlider.value = 2.0;
       renderDrafts();
       renderCollections();
-      resetEditState();
+      resetEditMode();
     })();
   </script>
 
   <script>
-    // ========== 音乐播放器（极细进度条，无滑块） ==========
+    // ========== 音乐播放器 ==========
     (function initMusicPlayer() {
       const icon = document.getElementById('musicIcon');
       const panel = document.getElementById('playerPanel');
