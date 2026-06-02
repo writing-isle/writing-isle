@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>写作之岛 · 三叠纸</title>
+  <title>The Isle of Writing · 三叠纸</title>
   <style>
     /* ========== 全局重置 ========== */
     * {
@@ -359,6 +359,36 @@
       align-items: center;
     }
 
+    /* ========== 加粗按钮 ========== */
+    .bold-btn {
+      background: transparent;
+      border: none;
+      padding: 0 4px;
+      margin-left: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #6A7A5A;
+      cursor: pointer;
+      opacity: 1;
+      letter-spacing: 0;
+      font-family: 'Times New Roman', 'Cormorant Garamond', serif;
+      line-height: 1;
+      transition: opacity 0.2s;
+      min-width: auto;
+      text-align: center;
+    }
+
+    .bold-btn:hover {
+      opacity: 0.8;
+      background: transparent;
+      border: none;
+    }
+
+    .editor b,
+    .editor strong {
+      font-weight: 550;
+    }
+
     .btn {
       background: transparent;
       border: 0.5px solid #9A9F82;
@@ -397,8 +427,8 @@
     .page-nav {
       display: none;
       align-items: center;
-      gap: 4px;
-      margin-left: 8px;
+      gap: 3px;
+      margin-left: 6px;
     }
 
     .page-nav.show {
@@ -408,7 +438,7 @@
     .page-nav-btn {
       background: transparent;
       border: none;
-      padding: 0 6px;
+      padding: 0 2px;
       font-size: 1.2rem;
       font-weight: 200;
       color: #6A7A5A;
@@ -451,6 +481,7 @@
       background: rgba(110, 127, 78, 0.18);
       border-radius: 10px;
       -webkit-appearance: none;
+      appearance: none;
     }
 
     input[type="range"]::-webkit-slider-thumb {
@@ -710,6 +741,7 @@
       line-height: 1.8;
       display: -webkit-box;
       -webkit-line-clamp: 4;
+      line-clamp: 4;
       -webkit-box-orient: vertical;
       overflow: hidden;
       flex: 1;
@@ -1078,6 +1110,7 @@
               <button class="btn" id="saveCurrentBtn">保存此页</button>
               <button class="btn" id="saveToDraftBtn">存入草稿</button>
               <button class="btn" id="saveToCollectionBtn">存入文集</button>
+              <button class="bold-btn" id="boldBtn" title="加粗">B</button>
               <div class="page-nav" id="pageNav">
                 <button class="page-nav-btn" id="prevArticleBtn">←</button>
                 <button class="page-nav-btn" id="nextArticleBtn">→</button>
@@ -1274,26 +1307,50 @@
 
       // ---------- 自动存草稿（自由编辑内容 → 转为草稿） ----------
       function autoSaveToDraft() {
-        if (editMode !== null) return; // 已有归属，不需要自动存草稿
+        // 只有在真正"自由编辑"（editMode === null）且有内容时才自动转草稿
+        // 如果当前内容来自文集或草稿，绝不自动转
+        if (editMode !== null) return;
 
+        // 额外安全检查：如果编辑器内容看起来像是从文集加载的，不自动转草稿
+        // 通过检查当前内容是否与某个文集的某篇文章完全一致来判断
         const { title, body } = getEditorContent();
         const bodyIsEmpty = body === '' || body === '<br>' || body === '<br />';
 
-        if (!bodyIsEmpty || title !== '未命名') {
-          // 有内容，创建草稿
-          const autoId = 'draft_' + Date.now();
-          const timeStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-          const draftTitle = title !== '未命名' ? title : '自动保存 ' + timeStr;
-          drafts.push({
-            id: autoId,
-            title: draftTitle,
-            content: body
-          });
-          editMode = { type: 'draft', draftId: autoId };
-          saveDraftsToStorage();
-          renderDrafts();
+        if (bodyIsEmpty && title === '未命名') return; // 完全为空，不产生草稿
+
+        // 检查当前内容是否属于某个已知的文集文章
+        for (const coll of collections) {
+          if (coll.items) {
+            for (const item of coll.items) {
+              if (item.content === body && item.title === title) {
+                // 内容和标题与某篇文集文章完全一致，说明刚加载进来还没改过
+                // 不自动转草稿
+                return;
+              }
+            }
+          }
         }
-        // 如果完全为空，不产生草稿
+
+        // 检查是否属于某个已知草稿
+        for (const draft of drafts) {
+          if (draft.content === body && draft.title === title) {
+            // 刚加载的草稿，不重复存
+            return;
+          }
+        }
+
+        // 安全通过，确实是无主内容 → 自动转草稿
+        const autoId = 'draft_' + Date.now();
+        const timeStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        const draftTitle = title !== '未命名' ? title : '自动保存 ' + timeStr;
+        drafts.push({
+          id: autoId,
+          title: draftTitle,
+          content: body
+        });
+        editMode = { type: 'draft', draftId: autoId };
+        saveDraftsToStorage();
+        renderDrafts();
       }
 
       // ---------- 切换操作前的保存 ----------
@@ -1579,6 +1636,35 @@
       }
 
       document.getElementById('newPageBtn').addEventListener('click', newBlankPage);
+      // ---------- 加粗按钮 ----------
+      document.getElementById('boldBtn').addEventListener('click', () => {
+        const selection = window.getSelection();
+        if (!selection.rangeCount || selection.isCollapsed) {
+          editorEl.focus();
+          return;
+        }
+
+        const range = selection.getRangeAt(0);
+
+        // 检查当前选区是否已被加粗
+        let parent = range.commonAncestorContainer;
+        if (parent.nodeType === 3) parent = parent.parentNode;
+
+        const isBold = parent.closest('b, strong');
+
+        if (isBold) {
+          // 取消加粗：用 textContent 替换掉 b/strong 标签
+          const text = isBold.textContent;
+          const textNode = document.createTextNode(text);
+          isBold.parentNode.replaceChild(textNode, isBold);
+        } else {
+          // 加粗
+          document.execCommand('bold');
+        }
+
+        editorEl.focus();
+        handleContentChange(); // 触发保存
+      });
 
       // ---------- 按钮事件 ----------
       // 保存此页（心理安慰，实际已自动保存）
